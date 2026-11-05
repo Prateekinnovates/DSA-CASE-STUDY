@@ -5,11 +5,20 @@ import CityMap from "./components/CityMap";
 import SidebarRight from "./components/SidebarRight";
 import NodeModal from "./components/NodeModal";
 import EdgeModal from "./components/EdgeModal";
-import { DEFAULT_GRAPH_DATA } from "./utils/sampleData";
-import * as api from "./services/api";
+import sampleCityData from "./data/sample_city.json";
+import {
+  CityGraph,
+  runDijkstra,
+  runAStar,
+  runBellmanFord,
+  findNearestFacility,
+  findAlternatePath,
+  compareAlgorithms,
+  blockRoadAndReroute
+} from "./lib";
 
 export default function App() {
-  const [graph, setGraph] = useState(DEFAULT_GRAPH_DATA);
+  const [graph, setGraph] = useState(sampleCityData);
   const [sourceNode, setSourceNode] = useState("F1");
   const [destNode, setDestNode] = useState("A1");
   const [algorithm, setAlgorithm] = useState("dijkstra");
@@ -35,24 +44,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const playbackTimerRef = useRef(null);
 
-  // Initial load: sync graph with backend API if accessible
-  useEffect(() => {
-    async function loadServerGraph() {
-      try {
-        setIsLoading(true);
-        const data = await api.fetchGraph();
-        if (data && data.nodes && data.nodes.length > 0) {
-          setGraph(data);
-        }
-      } catch (err) {
-        console.warn("Backend API not reachable yet, using built-in sample city dataset:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadServerGraph();
-  }, []);
-
   // Playback timer loop
   useEffect(() => {
     if (isPlaying && activeRoute && activeRoute.steps && activeRoute.steps.length > 0) {
@@ -74,8 +65,8 @@ export default function App() {
     };
   }, [isPlaying, activeRoute, playbackSpeed]);
 
-  // Compute Shortest Path
-  const handleFindRoute = async (customSource = null, customDest = null) => {
+  // Compute Shortest Path directly using client-side TypeScript DSA algorithms
+  const handleFindRoute = (customSource = null, customDest = null) => {
     const src = customSource || sourceNode;
     const dst = customDest || destNode;
 
@@ -88,30 +79,27 @@ export default function App() {
       setIsLoading(true);
       setIsPlaying(false);
 
-      // Primary Route
-      const res = await api.computeShortestPath({
-        source: src,
-        destination: dst,
-        algorithm,
-        graph,
-        include_steps: true
-      });
+      const cityGraph = new CityGraph(graph);
+      let res;
+
+      if (algorithm === "astar") {
+        res = runAStar(cityGraph, src, dst, true);
+      } else if (algorithm === "bellman_ford") {
+        res = runBellmanFord(cityGraph, src, dst, true);
+      } else {
+        res = runDijkstra(cityGraph, src, dst, true);
+      }
 
       setActiveRoute(res);
       setCurrentStepIndex(res.steps?.length ? res.steps.length - 1 : 0);
 
-      // Try computing backup alternate route
-      try {
-        // Run comparison to also feed analytics tab
-        const comp = await api.compareAlgorithms({
-          source: src,
-          destination: dst,
-          graph
-        });
-        setComparisonData(comp);
-      } catch (e) {
-        console.warn("Comparison fetch failed:", e);
-      }
+      // Derive backup alternate route using Yen's edge-deviation algorithm
+      const backup = findAlternatePath(cityGraph, src, dst, res);
+      setBackupRoute(backup || null);
+
+      // Run algorithm comparison to populate analytics tab
+      const comp = compareAlgorithms(cityGraph, src, dst);
+      setComparisonData(comp);
     } catch (err) {
       alert("Error finding shortest path: " + err.message);
     } finally {
@@ -119,17 +107,15 @@ export default function App() {
     }
   };
 
-  // Emergency Scenario: Auto-find Nearest Facility
-  const handleDispatchNearest = async () => {
+  // Emergency Scenario: Auto-find Nearest Facility via Multi-Source Dijkstra
+  const handleDispatchNearest = () => {
     let facilityType = "hospital";
     if (selectedEmergency === "fire_truck") facilityType = "fire_station";
     else if (selectedEmergency === "police") facilityType = "police_station";
 
-    // Destination is the incident node (e.g. A1 or currently selected dest)
     let incidentId = destNode;
     const incidentNodeObj = graph.nodes.find((n) => n.id === incidentId);
     if (!incidentNodeObj || incidentNodeObj.type !== "accident") {
-      // Pick the first accident node if current dest is not an accident
       const firstAccident = graph.nodes.find((n) => n.type === "accident");
       if (firstAccident) {
         incidentId = firstAccident.id;
@@ -141,12 +127,8 @@ export default function App() {
       setIsLoading(true);
       setIsPlaying(false);
 
-      const res = await api.findNearestFacility({
-        incident_node_id: incidentId,
-        facility_type: facilityType,
-        algorithm,
-        graph
-      });
+      const cityGraph = new CityGraph(graph);
+      const res = findNearestFacility(cityGraph, incidentId, facilityType, algorithm);
 
       if (res.nearest_facility && res.shortest_path) {
         setSourceNode(res.nearest_facility.id);
@@ -154,6 +136,10 @@ export default function App() {
         setActiveRoute(res.shortest_path);
         setBackupRoute(res.backup_path || null);
         setCurrentStepIndex(res.shortest_path.steps?.length ? res.shortest_path.steps.length - 1 : 0);
+
+        // Update comparison data
+        const comp = compareAlgorithms(cityGraph, res.nearest_facility.id, incidentId);
+        setComparisonData(comp);
       } else {
         alert(res.message || "No reachable facility found.");
       }
@@ -164,19 +150,18 @@ export default function App() {
     }
   };
 
-  // Compare all 3 algorithms
-  const handleCompare = async () => {
+  // Compare all 3 algorithms (Dijkstra vs A* vs Bellman-Ford)
+  const handleCompare = () => {
     try {
       setIsLoading(true);
-      const res = await api.compareAlgorithms({
-        source: sourceNode,
-        destination: destNode,
-        graph
-      });
+      const cityGraph = new CityGraph(graph);
+      const res = compareAlgorithms(cityGraph, sourceNode, destNode);
       setComparisonData(res);
-      // Also set active route to selected algorithm
+
       if (res[algorithm]) {
         setActiveRoute(res[algorithm]);
+        const backup = findAlternatePath(cityGraph, sourceNode, destNode, res[algorithm]);
+        setBackupRoute(backup || null);
         setCurrentStepIndex(res[algorithm].steps?.length ? res[algorithm].steps.length - 1 : 0);
       }
     } catch (err) {
@@ -186,26 +171,29 @@ export default function App() {
     }
   };
 
-  // Road Blockage & Dynamic Re-routing
-  const handleToggleBlockRoad = async (edge) => {
+  // Road Blockage & Dynamic Re-routing in client memory
+  const handleToggleBlockRoad = (edge) => {
     const nextStatus = edge.status === "blocked" ? "open" : "blocked";
 
     try {
       setIsLoading(true);
-      const res = await api.toggleRoadBlockage({
-        edge_id: edge.id,
+      const cityGraph = new CityGraph(graph);
+      const res = blockRoadAndReroute({
+        graph: cityGraph,
+        edgeId: edge.id,
         status: nextStatus,
         recompute: Boolean(activeRoute && activeRoute.found),
-        active_source: sourceNode,
-        active_destination: destNode,
-        algorithm,
-        graph
+        activeSource: sourceNode,
+        activeDestination: destNode,
+        algorithm
       });
 
       setGraph(res.graph);
 
       if (res.recomputed_path) {
         setActiveRoute(res.recomputed_path);
+        const backup = findAlternatePath(cityGraph, sourceNode, destNode, res.recomputed_path);
+        setBackupRoute(backup || null);
         setCurrentStepIndex(res.recomputed_path.steps?.length ? res.recomputed_path.steps.length - 1 : 0);
       }
     } catch (err) {
@@ -215,7 +203,7 @@ export default function App() {
     }
   };
 
-  // Node Drag End (Update coordinates)
+  // Node Drag End (Update coordinates in client state)
   const handleNodeDragEnd = (nodeId, lat, lng) => {
     setGraph((prev) => ({
       ...prev,
@@ -250,7 +238,6 @@ export default function App() {
         setEdgeSourceNode(null);
       }
     } else if (interactionMode === "select") {
-      // If clicking node without origin set, set origin; if origin set, set dest
       if (!sourceNode) {
         setSourceNode(node.id);
       } else if (!destNode && node.id !== sourceNode) {
@@ -304,27 +291,15 @@ export default function App() {
     setIsEdgeModalOpen(false);
   };
 
-  // Reset Graph to Preset
-  const handleResetGraph = async () => {
-    try {
-      setIsLoading(true);
-      const data = await api.resetGraphOnServer();
-      setGraph(data);
-      setActiveRoute(null);
-      setBackupRoute(null);
-      setComparisonData(null);
-    } catch (err) {
-      console.warn("Using default client preset:", err);
-      setGraph(DEFAULT_GRAPH_DATA);
-      setActiveRoute(null);
-      setBackupRoute(null);
-      setComparisonData(null);
-    } finally {
-      setIsLoading(false);
-    }
+  // Reset Graph to Preset sample city JSON directly
+  const handleResetGraph = () => {
+    setGraph(JSON.parse(JSON.stringify(sampleCityData)));
+    setActiveRoute(null);
+    setBackupRoute(null);
+    setComparisonData(null);
   };
 
-  // Export Graph JSON
+  // Export Graph JSON in browser
   const handleExportGraph = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(graph, null, 2));
     const downloadAnchor = document.createElement("a");
@@ -335,19 +310,12 @@ export default function App() {
     downloadAnchor.remove();
   };
 
-  // Import Graph JSON
-  const handleImportGraph = async (importedGraph) => {
-    try {
-      setIsLoading(true);
-      const res = await api.saveGraphOnServer(importedGraph);
-      setGraph(res);
-      setActiveRoute(null);
-      setBackupRoute(null);
-    } catch (err) {
-      setGraph(importedGraph);
-    } finally {
-      setIsLoading(false);
-    }
+  // Import Graph JSON directly in browser
+  const handleImportGraph = (importedGraph) => {
+    setGraph(importedGraph);
+    setActiveRoute(null);
+    setBackupRoute(null);
+    setComparisonData(null);
   };
 
   const currentStep = activeRoute?.steps?.[currentStepIndex] || null;
@@ -473,4 +441,3 @@ export default function App() {
     </div>
   );
 }
-

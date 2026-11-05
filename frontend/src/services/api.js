@@ -1,25 +1,35 @@
-const API_BASE = "/api";
+/**
+ * In-memory client service replacing all HTTP/fetch calls with direct TypeScript module invocations.
+ * Zero external network or backend dependencies.
+ */
+
+import {
+  CityGraph,
+  runDijkstra,
+  runAStar,
+  runBellmanFord,
+  findNearestFacility as libFindNearestFacility,
+  findAlternatePath as libFindAlternatePath,
+  compareAlgorithms as libCompareAlgorithms,
+  blockRoadAndReroute
+} from "../lib";
+import defaultSampleData from "../data/sample_city.json";
+
+// In-memory global graph instance
+let activeGraph = new CityGraph(defaultSampleData);
 
 export async function fetchGraph() {
-  const res = await fetch(`${API_BASE}/graph`);
-  if (!res.ok) throw new Error("Failed to fetch graph from server");
-  return res.json();
+  return activeGraph.toGraphData();
 }
 
 export async function resetGraphOnServer() {
-  const res = await fetch(`${API_BASE}/graph/reset`, { method: "POST" });
-  if (!res.ok) throw new Error("Failed to reset graph");
-  return res.json();
+  activeGraph = new CityGraph(JSON.parse(JSON.stringify(defaultSampleData)));
+  return activeGraph.toGraphData();
 }
 
 export async function saveGraphOnServer(graphData) {
-  const res = await fetch(`${API_BASE}/graph`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(graphData)
-  });
-  if (!res.ok) throw new Error("Failed to update graph on server");
-  return res.json();
+  activeGraph = new CityGraph(graphData);
+  return activeGraph.toGraphData();
 }
 
 export async function computeShortestPath({
@@ -29,22 +39,16 @@ export async function computeShortestPath({
   graph = null,
   include_steps = true
 }) {
-  const res = await fetch(`${API_BASE}/shortest-path`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      source,
-      destination,
-      algorithm,
-      graph,
-      include_steps
-    })
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Shortest path computation failed");
+  const g = graph ? new CityGraph(graph) : activeGraph;
+  const algo = algorithm.toLowerCase();
+
+  if (algo === "astar") {
+    return runAStar(g, source, destination, include_steps);
+  } else if (algo === "bellman_ford") {
+    return runBellmanFord(g, source, destination, include_steps);
+  } else {
+    return runDijkstra(g, source, destination, include_steps);
   }
-  return res.json();
 }
 
 export async function findNearestFacility({
@@ -53,21 +57,8 @@ export async function findNearestFacility({
   algorithm = "dijkstra",
   graph = null
 }) {
-  const res = await fetch(`${API_BASE}/nearest-facility`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      incident_node_id,
-      facility_type,
-      algorithm,
-      graph
-    })
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Nearest facility dispatch failed");
-  }
-  return res.json();
+  const g = graph ? new CityGraph(graph) : activeGraph;
+  return libFindNearestFacility(g, incident_node_id, facility_type, algorithm);
 }
 
 export async function toggleRoadBlockage({
@@ -80,25 +71,23 @@ export async function toggleRoadBlockage({
   algorithm = "dijkstra",
   graph = null
 }) {
-  const res = await fetch(`${API_BASE}/block-road`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      edge_id,
-      status,
-      traffic_multiplier,
-      recompute,
-      active_source,
-      active_destination,
-      algorithm,
-      graph
-    })
+  const g = graph ? new CityGraph(graph) : activeGraph;
+  const res = blockRoadAndReroute({
+    graph: g,
+    edgeId: edge_id,
+    status,
+    trafficMultiplier: traffic_multiplier,
+    recompute,
+    activeSource: active_source,
+    activeDestination: active_destination,
+    algorithm
   });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Failed to update road status");
+
+  if (!graph) {
+    activeGraph = g;
   }
-  return res.json();
+
+  return res;
 }
 
 export async function compareAlgorithms({
@@ -106,19 +95,16 @@ export async function compareAlgorithms({
   destination,
   graph = null
 }) {
-  const res = await fetch(`${API_BASE}/compare`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      source,
-      destination,
-      graph
-    })
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Algorithm comparison failed");
-  }
-  return res.json();
+  const g = graph ? new CityGraph(graph) : activeGraph;
+  return libCompareAlgorithms(g, source, destination);
 }
 
+export async function findAlternatePath({
+  source,
+  destination,
+  primary_path,
+  graph = null
+}) {
+  const g = graph ? new CityGraph(graph) : activeGraph;
+  return libFindAlternatePath(g, source, destination, primary_path);
+}

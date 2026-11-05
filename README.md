@@ -1,35 +1,35 @@
 # 🚑 Route-O-Rescue: Shortest Path Planning for Emergency Services
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?style=flat&logo=react)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-5.2-646CFF?style=flat&logo=vite)](https://vitejs.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-3178C6?style=flat&logo=typescript)](https://www.typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=flat&logo=vite)](https://vitejs.dev)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com)
 [![Leaflet](https://img.shields.io/badge/Leaflet-1.9-199900?style=flat&logo=leaflet)](https://leafletjs.com)
-[![Python Tests](https://img.shields.io/badge/Pytest-23%20Passed-brightgreen?style=flat&logo=pytest)](https://pytest.org)
+[![Zero Backend](https://img.shields.io/badge/Backend-100%25%20Client--Side-brightgreen?style=flat)](#)
 
 **Route-O-Rescue** is an interactive, mission-critical emergency dispatch and route optimization platform. It models urban infrastructure as a directed/undirected weighted graph where intersections, hospitals, fire stations, and accident sites form vertices, while streets with distance, dynamic traffic multipliers, and road closures form weighted edges.
 
-All graph algorithms—including **Dijkstra's Algorithm**, **A\* Search**, **Bellman-Ford**, and **Multi-Source Dijkstra**—are **implemented entirely from scratch** without graph libraries (like `networkx`) or built-in priority queue modules.
+All graph algorithms—including **Dijkstra's Algorithm**, **A\* Search**, **Bellman-Ford**, and **Multi-Source Dijkstra**—are implemented **completely from scratch in TypeScript modules** (`src/lib/`), executing directly in the client browser with zero backend server or network latency.
 
 ---
 
 ## 🌟 Core Features
 
-### 1. 🗺️ Interactive Graph Builder & Map
-- **Click-to-Build**: Click anywhere on the dark map canvas to add facilities (**Hospital**, **Fire Station**, **Police Station**, **Junction**, or **Accident Site**).
-- **Interactive Road Network**: Connect vertices with weighted edges including distance (km), traffic multiplier factor ($1.0\times$ to $5.0\times$), speed limit (km/h), and status (`open` or `blocked`).
-- **Drag-to-Move**: Drag any node to reposition it; coordinates and road lengths dynamically update.
-- **Import / Export**: Save and load custom city graphs as JSON.
-- **Preset City**: Preloaded with a realistic 24-node, 45-edge **Metro City Emergency Response Network**.
+### 1. ⚡ Pure From-Scratch TypeScript Graph Algorithms (`src/lib/`)
+- **Dijkstra's Algorithm** ([`dijkstra.ts`](file:///c:/Users/prate/OneDrive/Desktop/DSA%20Case%20Study/frontend/src/lib/dijkstra.ts)): Implemented with a custom **Binary Min-Heap Priority Queue** (`priorityQueue.ts`) from scratch. Guarantees optimal shortest paths on non-negative weighted graphs in $\mathcal{O}((V + E) \log V)$ time.
+- **A\* Search** ([`astar.ts`](file:///c:/Users/prate/OneDrive/Desktop/DSA%20Case%20Study/frontend/src/lib/astar.ts)): Uses an admissible and consistent **Haversine great-circle distance heuristic** scaled by maximum network velocity, steering the frontier directly toward the destination.
+- **Bellman-Ford Algorithm** ([`bellmanFord.ts`](file:///c:/Users/prate/OneDrive/Desktop/DSA%20Case%20Study/frontend/src/lib/bellmanFord.ts)): Iteratively relaxes all edges across $|V|-1$ passes in $\mathcal{O}(V \cdot E)$ time, detects negative weight cycles, and demonstrates dynamic road congestion handling.
+- **Multi-Source Dijkstra** ([`multiSource.ts`](file:///c:/Users/prate/OneDrive/Desktop/DSA%20Case%20Study/frontend/src/lib/multiSource.ts)): Evaluates all available emergency stations across the city simultaneously to auto-dispatch the nearest unit to an incident.
+- **Backup Alternate Route (Yen's Edge-Deviation)** ([`alternatePath.ts`](file:///c:/Users/prate/OneDrive/Desktop/DSA%20Case%20Study/frontend/src/lib/alternatePath.ts)): Computes a resilient second-shortest path as an immediate detour in case the primary road becomes congested or blocked en route.
 
-### 2. ⚡ Pure From-Scratch Graph Algorithms
-- **Dijkstra's Algorithm**: Implemented with a custom **Binary Min-Heap Priority Queue** from scratch. Guarantees optimal shortest paths on non-negative weighted graphs in $\mathcal{O}((V + E) \log V)$ time.
-- **A\* Search**: Uses an admissible and consistent **Haversine great-circle distance heuristic** scaled by maximum velocity, ensuring fewer explored vertices while maintaining guaranteed optimality.
-- **Bellman-Ford Algorithm**: Iteratively relaxes all edges across $|V|-1$ passes. Demonstrates dynamic weight adaptation and verifies absence of negative-weight cycles in $\mathcal{O}(V \cdot E)$ time.
-- **Multi-Source Dijkstra**: Dispatches the closest emergency unit across multiple distributed stations to an incident site with one click.
-- **Backup Alternate Route (Yen's Edge-Deviation)**: Computes a resilient second-shortest path as an immediate detour in case the primary road becomes congested or blocked en route.
+### 2. 🗺️ Interactive Graph Builder & Map
+- **Click-to-Build**: Click anywhere on the map to add facilities (**Hospital**, **Fire Station**, **Police Station**, **Junction**, or **Accident Site**).
+- **Interactive Road Network**: Connect vertices with weighted edges including distance (km), traffic multiplier factor ($1.0\times$ to $4.0\times$), speed limit (km/h), and status (`open` or `blocked`).
+- **Drag-to-Move**: Drag any node to reposition it; coordinates and road lengths dynamically update in client state.
+- **Browser Import / Export**: Save and load custom city graphs as JSON directly through the browser.
+- **Preset City**: Preloaded with a realistic 24-node, 45-edge **Metro City Emergency Response Network** (`src/data/sample_city.json`).
 
-### 3. 🚨 Real-Time Emergency Scenarios & Auto-Rerouting
+### 3. 🚨 Real-Time Emergency Scenarios & Dynamic Re-Routing
 - **Ambulance Emergency**: Auto-finds the nearest Level-1 trauma center or community hospital to an accident site.
 - **Fire Response**: Auto-dispatches the closest ladder brigade or heavy rescue fire station to structural fires.
 - **Police Dispatch**: Rapid response routing from tactical precincts to active incidents.
@@ -88,142 +88,60 @@ Since no vehicle can exceed the maximum network speed $v_{\max}$ and road paths 
 
 ```
 DSA Case Study/
-├── backend/
-│   ├── app/
-│   │   ├── algorithms/
-│   │   │   ├── priority_queue.py   # Custom Binary Min-Heap (pure scratch)
-│   │   │   ├── dijkstra.py         # Dijkstra with step recorder
-│   │   │   ├── astar.py            # A* with Haversine heuristic
-│   │   │   ├── bellman_ford.py     # Bellman-Ford with iterative relaxation
-│   │   │   ├── multi_source.py     # Multi-Source nearest facility dispatch
-│   │   │   └── alternate_path.py   # Yen's edge-deviation second shortest path
-│   │   ├── data/
-│   │   │   └── sample_city.json    # Metro City: 24 nodes, 45 edges
-│   │   ├── graph.py                # Graph data structure & cost modeling
-│   │   ├── models.py               # Pydantic request/response schemas
-│   │   └── main.py                 # FastAPI application & REST endpoints
-│   ├── tests/
-│   │   ├── test_priority_queue.py  # MinHeap data structure unit tests
-│   │   ├── test_algorithms.py      # Dijkstra, A*, Bellman-Ford accuracy tests
-│   │   ├── test_edge_cases.py      # Disconnected, same node, zero cost, road blocks
-│   │   ├── test_multi_source.py    # Multi-source dispatch tests
-│   │   └── test_api.py             # FastAPI REST endpoint integration tests
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── CityMap.jsx          # Leaflet dark map with SVG routes & vehicle
-│   │   │   ├── Navbar.jsx           # Header, live stats, presets, import/export
-│   │   │   ├── SidebarLeft.jsx      # Scenario selector, algorithm picker, map tools
-│   │   │   ├── SidebarRight.jsx     # Playback controls, Min-Heap viewer, analytics
-│   │   │   ├── PlaybackControls.jsx # Play, pause, step forward/back, speed
-│   │   │   ├── ComparisonChart.jsx  # Benchmark visual bar chart
-│   │   │   ├── NodeModal.jsx        # Add/edit vertex modal
-│   │   │   ├── EdgeModal.jsx        # Add/edit weighted road modal
-│   │   │   └── Legend.jsx           # Floating map legend
-│   │   ├── services/
-│   │   │   └── api.js               # REST client for FastAPI
-│   │   ├── utils/
-│   │   │   ├── helpers.js           # Formatters, color themes, traffic helpers
-│   │   │   └── sampleData.js        # Fallback offline client dataset
-│   │   ├── App.jsx                  # Main dashboard layout & state orchestrator
-│   │   ├── index.css                # Dark emergency aesthetic & glowing styling
-│   │   └── main.jsx
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── vercel.json
-├── render.yaml                      # Deploy configuration for Render
-└── README.md
+└── frontend/
+    ├── src/
+    │   ├── lib/                     # Pure TypeScript graph algorithms from scratch
+    │   │   ├── types.ts             # TypeScript interfaces for nodes, edges, steps, responses
+    │   │   ├── priorityQueue.ts     # Binary Min-Heap Priority Queue (pure scratch)
+    │   │   ├── graph.ts             # CityGraph class, adjacency list & Haversine distance
+    │   │   ├── dijkstra.ts          # Dijkstra with step-by-step state recording
+    │   │   ├── astar.ts             # A* Search with admissible Haversine heuristic
+    │   │   ├── bellmanFord.ts       # Bellman-Ford with iterative relaxation passes
+    │   │   ├── multiSource.ts       # Multi-Source nearest facility dispatch
+    │   │   ├── alternatePath.ts     # Yen's edge-deviation second-shortest path
+    │   │   └── index.ts             # Barrel export & algorithm comparison runner
+    │   ├── data/
+    │   │   └── sample_city.json     # Metro City dataset: 24 nodes, 45 edges
+    │   ├── components/
+    │   │   ├── CityMap.jsx          # Leaflet dark map with SVG routes & vehicle marker
+    │   │   ├── Navbar.jsx           # Header, live stats, presets, import/export JSON
+    │   │   ├── SidebarLeft.jsx      # Scenario selector, algorithm picker, map tools
+    │   │   ├── SidebarRight.jsx     # Playback controls, Min-Heap viewer, analytics
+    │   │   ├── PlaybackControls.jsx # Play, pause, step forward/back, speed slider
+    │   │   ├── ComparisonChart.jsx  # Benchmark visual bar chart
+    │   │   ├── NodeModal.jsx        # Add/edit vertex modal
+    │   │   ├── EdgeModal.jsx        # Add/edit weighted road modal
+    │   │   └── Legend.jsx           # Floating map legend
+    │   ├── utils/
+    │   │   ├── helpers.js           # Formatters, color themes, traffic helpers
+    │   │   └── sampleData.js        # Fallback dataset
+    │   ├── App.jsx                  # Main dashboard layout & state orchestrator
+    │   ├── index.css                # Dark emergency aesthetic & glowing styling
+    │   └── main.jsx
+    ├── package.json
+    ├── vite.config.js
+    ├── tailwind.config.js
+    └── vercel.json                  # Vercel deployment configuration
 ```
 
 ---
 
-## 🚀 Setup & Local Execution Instructions
+## 🚀 Setup & Execution
 
 ### Prerequisites
-- **Python**: 3.10+
 - **Node.js**: v18+ and `npm`
 
-### 1. Backend Setup (FastAPI)
+### Start Development Server
 ```bash
-# Navigate to backend directory
-cd "DSA Case Study/backend"
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the full unit test suite (23 tests)
-$env:PYTHONPATH="." # On Windows PowerShell
-pytest tests -v
-
-# Start the FastAPI server
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-The backend API documentation is now live at: `http://127.0.0.1:8000/docs`
-
-### 2. Frontend Setup (React + Vite + Tailwind)
-```bash
-# Open a new terminal and navigate to frontend directory
-cd "DSA Case Study/frontend"
-
-# Install packages
+cd frontend
 npm install
-
-# Start development server
 npm run dev
 ```
 Open your browser at: `http://localhost:5173`
 
----
-
-## 🧪 Unit Test Coverage (pytest)
-The test suite in `backend/tests/` verifies correctness and handles critical edge cases:
-- `test_priority_queue.py`: Custom `MinHeap` push, pop, order preservation, tie-breaking, and state serialization.
-- `test_algorithms.py`: Dijkstra, A\*, Bellman-Ford path accuracy, cost equivalence, and second-shortest path derivation.
-- `test_edge_cases.py`:
-  - Disconnected graph (returns `found: False` with descriptive error).
-  - Source equals destination ($\text{distance} = 0$, immediate path).
-  - Blocked roads (safely detours around blocked segments).
-  - Heavy traffic congestion (diverts onto faster routes despite longer raw distance).
-  - Invalid / nonexistent node identifiers.
-- `test_multi_source.py`: Multi-source hospital and fire station emergency dispatch.
-- `test_api.py`: Full REST API endpoint verification with `TestClient`.
-
-To execute:
+### Production Build
 ```bash
-pytest backend/tests -v
+cd frontend
+npm run build
 ```
-Output:
-```text
-======================= 23 passed in 0.46s =======================
-```
-
----
-
-## 🌐 Cloud Deployment Guide
-
-### Deploying Backend to Render
-1. Push the repository to GitHub.
-2. In [Render](https://render.com), create a new **Web Service**.
-3. Choose runtime **Python 3**.
-4. Set Build Command: `pip install -r backend/requirements.txt`
-5. Set Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-6. Set Environment Variable: `PYTHONPATH=backend`
-*(Alternatively, import `render.yaml` directly).*
-
-### Deploying Frontend to Vercel
-1. In [Vercel](https://vercel.com), import the `frontend/` directory.
-2. Set Build Command: `npm run build`
-3. Set Output Directory: `dist`
-4. The included `frontend/vercel.json` ensures client-side routing works smoothly.
-
----
-
-## 🔮 Future Scope & Extensibility
-1. **Real-Time Traffic APIs**: Ingest live congestion data from Google Maps Directions API or TomTom Traffic Flow into edge weights.
-2. **OpenStreetMap Overpass Integration**: Import real-world street geometry and intersections for any geographic city coordinate bounding box.
-3. **Multi-Vehicle Fleet Dispatch**: Implement Hungarian Algorithm / Minimum Cost Maximum Flow (MCMF) for dispatching multiple emergency units to multiple simultaneous accidents.
-4. **Emergency Green Wave Preemption**: Model traffic light preemption along the emergency corridor to clear red lights before vehicle arrival.
-
+Creates an optimized static bundle in `frontend/dist/` ready for immediate deployment to Vercel, Netlify, or GitHub Pages.
